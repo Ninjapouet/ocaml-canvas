@@ -38,33 +38,9 @@
 #include "ml_tags.h"
 #include "ml_convert.h"
 
-#if OCAML_VERSION < 41200
+#if OCAML_VERSION >= 50000
 
-#define Val_none Val_int(0)
-#define Some_val(v) Field(v, 0)
-#define Tag_some 0
-#define Is_none(v) ((v) == Val_none)
-#define Is_some(v) Is_block(v)
-
-CAMLexport value caml_alloc_some(value v)
-{
-  CAMLparam1(v);
-  value some = caml_alloc_small(1, 0);
-  Field(some, 0) = v;
-  CAMLreturn(some);
-}
-
-#endif /* OCAML_VERSION < 41200 */
-
-#if OCAML_VERSION < 40400
-
-CAMLprim value caml_make_float_vect(value len);
-
-#define caml_alloc_float_array(len) caml_make_float_vect(Val_long(len))
-
-#endif /* OCAML_VERSION < 40400 */
-
-#if OCAML_VERSION < 40800 || OCAML_VERSION >= 50000
+// OCaml 5 no longer provides the caml_weak_array_* functions
 
 CAMLextern value caml_ephe_create(value len);
 CAMLextern value caml_ephe_set_key(value ar, value n, value el);
@@ -95,7 +71,7 @@ CAMLexport int caml_weak_array_get(value eph, mlsize_t offset, value *key)
 
 #include "caml/weak.h"
 
-#endif /* OCAML_VERSION < 40800 || OCAML_VERSION >= 50000 */
+#endif /* OCAML_VERSION >= 50000 */
 
 
 value
@@ -771,9 +747,7 @@ static struct custom_operations _ml_canvas_ops = {
   custom_serialize_default,
   custom_deserialize_default,
   custom_compare_ext_default,
-#if OCAML_VERSION >= 40800
   custom_fixed_length_default
-#endif
 };
 
 value
@@ -858,9 +832,7 @@ static struct custom_operations _ml_path2d_ops = {
   custom_serialize_default,
   custom_deserialize_default,
   custom_compare_ext_default,
-#if OCAML_VERSION >= 40800
   custom_fixed_length_default
-#endif
 };
 
 value
@@ -945,9 +917,7 @@ static struct custom_operations _ml_gradient_ops = {
   custom_serialize_default,
   custom_deserialize_default,
   custom_compare_ext_default,
-#if OCAML_VERSION >= 40800
   custom_fixed_length_default
-#endif
 };
 
 value
@@ -1033,9 +1003,7 @@ static struct custom_operations _ml_pattern_ops = {
   custom_serialize_default,
   custom_deserialize_default,
   custom_compare_ext_default,
-#if OCAML_VERSION >= 40800
   custom_fixed_length_default
-#endif
 };
 
 value

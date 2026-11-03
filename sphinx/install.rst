@@ -13,10 +13,10 @@ Build and install with :code:`dune`
 
 Checkout the sources of :code:`ocaml-canvas` in a directory.
 
-You need a switch with at least version :code:`4.03.0` of OCaml,
-you can for example create it with::
+You need a switch with OCaml 4.14 (the long-term support branch)
+or OCaml 5, you can for example create it with::
 
-  opam switch create 4.14.0
+  opam switch create 4.14.4
 
 Then, you need to install all the dependencies::
 

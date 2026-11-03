@@ -17,16 +17,11 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - windows-latest
+        # The maintained OCaml versions: the 4.14 long-term support
+        # branch and the latest 5.x release
         ocaml-compiler:
           - "4.14"
           - "5"
-        skip_test:
-          - false
-
-        include:
-          - os: ubuntu-latest
-            ocaml-compiler: "4.08"
-            skip_test: true
 
     runs-on: ${{ matrix.os }}
 
@@ -53,13 +48,13 @@ jobs:
 
       # Even offscreen canvases need a display connection on X11
       - name: Run test suite (Linux)
-        if: matrix.skip_test != true && runner.os == 'Linux'
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get install -yqq xvfb
           xvfb-run -a make test
 
       - name: Run test suite
-        if: matrix.skip_test != true && runner.os != 'Linux'
+        if: runner.os != 'Linux'
         run: make test
 
       - name: build-doc

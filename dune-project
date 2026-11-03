@@ -16,7 +16,7 @@
 (package
  (name ocaml-canvas)
  (depends
-  (ocaml (>= 4.03))
+  (ocaml (>= 4.14))
   (dune (>= 2.2))
   (dune-configurator (>= 1.11))
   (react (>= 1.0))
