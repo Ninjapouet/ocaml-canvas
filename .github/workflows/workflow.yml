@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # setup-ocaml v3 caches the opam root itself
       - name: Use OCaml ${{ matrix.ocaml-compiler }}
@@ -69,7 +69,8 @@ jobs:
 
       - name: deploy-doc
         uses: JamesIves/github-pages-deploy-action@v4
-        if: github.ref == 'refs/heads/master' && matrix.ocaml-compiler == '4.14' && runner.os == 'Linux'
+        # Forks build the documentation but do not publish it
+        if: github.repository == 'OCamlPro/ocaml-canvas' && github.ref == 'refs/heads/master' && matrix.ocaml-compiler == '4.14' && runner.os == 'Linux'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: gh-pages

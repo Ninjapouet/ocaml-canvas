@@ -63,7 +63,9 @@ The following program creates a windowed canvas with an orange background,
 a cyan border, and the "Hello world !" text drawn rotated in the middle.
 The user may press the "Escape" key or close the window to exit the
 program. It will show the number of frames displayed when quitting.
+
 ::
+
     open OcamlCanvas.V1
 
     let () =
