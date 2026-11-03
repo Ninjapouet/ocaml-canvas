@@ -30,7 +30,7 @@
 
 #define between(x,l,h) (((l) < (x)) && ((x) < (h)))
 
-#define clip(a,b,c) ((a) < (b) ? (b) : (a) > (c) ? (c) : b)
+#define clip(a,b,c) ((a) < (b) ? (b) : (a) > (c) ? (c) : (a))
 
 int16_t
 clip_i32_to_i16(
