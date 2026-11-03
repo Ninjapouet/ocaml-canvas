@@ -22,7 +22,7 @@ let march_config _c =
 
 let gdi_config _c =
   [ "-DHAS_GDI"; "-DUNICODE"; "-D_UNICODE" ],
-  [ "-lkernel32"; "-lgdi32"; "-lgdiplus" ]
+  [ "-lkernel32"; "-lgdi32"; "-lgdiplus"; "-lwinmm" ]
 
 let qtz_config _c =
   [ "-DHAS_QUARTZ"; "-Qunused-arguments";

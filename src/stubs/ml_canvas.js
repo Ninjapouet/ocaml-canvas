@@ -1672,6 +1672,23 @@ function ml_canvas_get_canvas(id) {
   return surface.canvas;
 }
 
+//Provides: _ml_canvas_frame_rate
+var _ml_canvas_frame_rate = 60;
+
+// The browser sets the frame rate: the value is only recorded
+//Provides: ml_canvas_set_frame_rate
+//Requires: _ml_canvas_frame_rate
+function ml_canvas_set_frame_rate(fps) {
+  _ml_canvas_frame_rate = fps;
+  return 0;
+}
+
+//Provides: ml_canvas_get_frame_rate
+//Requires: _ml_canvas_frame_rate
+function ml_canvas_get_frame_rate() {
+  return _ml_canvas_frame_rate;
+}
+
 //Provides: ml_canvas_get_current_timestamp
 //Requires: _ml_canvas_ensure_initialized
 //Requires: caml_int64_of_float

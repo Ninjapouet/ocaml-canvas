@@ -239,6 +239,24 @@ backend_run(
   _backend_event_listener.next_listener = NULL;
 }
 
+static int32_t _backend_frame_rate = 60;
+
+void
+backend_set_frame_rate(
+  int32_t fps)
+{
+  assert(fps > 0);
+
+  _backend_frame_rate = fps;
+}
+
+int32_t
+backend_get_frame_rate(
+  void)
+{
+  return _backend_frame_rate;
+}
+
 void
 backend_stop(
   void)

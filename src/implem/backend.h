@@ -54,4 +54,15 @@ canvas_t *
 backend_get_canvas(
   int32_t id);
 
+/* Rate of the frame event, in frames per second (60 by default).
+   Backends read it at every frame, so a change applies from the next
+   frame on. */
+void
+backend_set_frame_rate(
+  int32_t fps);
+
+int32_t
+backend_get_frame_rate(
+  void);
+
 #endif /* __BACKEND_H */

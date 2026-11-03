@@ -1980,6 +1980,23 @@ ml_canvas_get_canvas(
 }
 
 CAMLprim value
+ml_canvas_set_frame_rate(
+  value mlFps)
+{
+  CAMLparam1(mlFps);
+  backend_set_frame_rate(Int_val(mlFps));
+  CAMLreturn(Val_unit);
+}
+
+CAMLprim value
+ml_canvas_get_frame_rate(
+  value mlUnit)
+{
+  CAMLparam1(mlUnit);
+  CAMLreturn(Val_int(backend_get_frame_rate()));
+}
+
+CAMLprim value
 ml_canvas_get_current_timestamp(
   void)
 {

@@ -19,9 +19,11 @@
 
 #include <windows.h>
 #include <windowsx.h>
+#include <mmsystem.h>
 
 #include "../hashtable.h"
 #include "../event.h"
+#include "../backend.h"
 #include "gdi_keyboard.h"
 #include "gdi_window_internal.h"
 #include "gdi_backend_internal.h"
@@ -303,6 +305,22 @@ _gdi_mouse_event_state(
   return (button_state_t)0;
 }
 
+/* The default resolution of Windows timers (about 15.6 ms) caps the
+   frame rate at about 64 Hz. A finer resolution is requested only for
+   higher frame rates, as it increases power consumption. */
+static void
+_gdi_adjust_timer_resolution(
+  bool *fine)
+{
+  bool need_fine = backend_get_frame_rate() > 60;
+  if (need_fine && !*fine) {
+    *fine = (timeBeginPeriod(1) == TIMERR_NOERROR);
+  } else if (!need_fine && *fine) {
+    timeEndPeriod(1);
+    *fine = false;
+  }
+}
+
 void
 gdi_backend_run(
   void)
@@ -310,10 +328,13 @@ gdi_backend_run(
   assert(gdi_back != NULL);
   assert(gdi_back->running == false);
 
+  bool fine_timer = false;
+
   gdi_back->running = true;
   gdi_back->next_frame = gdi_get_time();
 
   while (gdi_back->running) {
+    _gdi_adjust_timer_resolution(&fine_timer);
     MSG msg;
     if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
       if (msg.message == WM_QUIT) {
@@ -330,10 +351,14 @@ gdi_backend_run(
                                                      QS_ALLEVENTS))) {
         _gdi_render_all_windows();
         do {
-          gdi_back->next_frame += 1000000 / 60;
+          gdi_back->next_frame += 1000000 / backend_get_frame_rate();
         } while (gdi_back->next_frame < cur_time);
       }
     }
+  }
+
+  if (fine_timer) {
+    timeEndPeriod(1);
   }
 }
 
@@ -358,7 +383,7 @@ _gdi_modal_timer_proc(
   if (timeout <= 4) {
     _gdi_render_all_windows();
     do {
-      gdi_back->next_frame += 1000000 / 60;
+      gdi_back->next_frame += 1000000 / backend_get_frame_rate();
     } while (gdi_back->next_frame < cur_time);
   }
 }

@@ -1440,8 +1440,9 @@ module V1 : sig
 
     val frame : unit canvas_event React.event
     (** Occurs when the backend determines it is time to draw a new frame.
-        A typical frequency is 60 times per second, though this varies
-        depending on the platform. *)
+        The frequency is set by {!Backend.setFrameRate} (60 times per
+        second by default), except on the JavaScript backend, where it
+        is set by the browser. *)
 
     val focus_in : unit canvas_event React.event
     (** Occurs when the canvas becomes active as a
@@ -1549,6 +1550,21 @@ module V1 : sig
         {ul
         {- {!Exception.Not_initialized} if {!Backend.init} was not called}
         {- {!Not_found} if no canvas has id [i]}} *)
+
+    val setFrameRate : int -> unit
+    (** [setFrameRate fps] sets the rate of the {!Event.frame} event,
+        in frames per second (60 by default). The change applies from
+        the next frame on. When a frame takes longer than the period to
+        process, the late frames are skipped. On the JavaScript backend,
+        the rate is set by the browser and this function has no effect.
+
+        {b Exceptions:}
+        {ul
+        {- [Invalid_argument] if [fps] is not within 1..1000}} *)
+
+    val getFrameRate : unit -> int
+    (** [getFrameRate ()] returns the rate of the {!Event.frame} event,
+        in frames per second, as set by {!setFrameRate} *)
 
     val getCurrentTimestamp : unit -> Event.timestamp
     (** [getCurrentTimestamp ()] returns the current timestamp

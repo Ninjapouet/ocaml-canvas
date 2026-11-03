@@ -23,6 +23,7 @@
 
 #include "../hashtable.h"
 #include "../event.h"
+#include "../backend.h"
 #include "qtz_util.h"
 #include "qtz_keyboard.h"
 #include "qtz_window_internal.h"
@@ -405,9 +406,21 @@ qtz_backend_run(
   CFRunLoopRef runloop = CFRunLoopGetMain();
   CFRetain(runloop);
 
+  /* The timer re-arms itself after each frame, with the frame rate
+     in force at that time, so that a rate change applies at once.
+     Frames that are late are skipped. */
+  __block CFAbsoluteTime next_frame =
+    CFAbsoluteTimeGetCurrent() + 1.0 / backend_get_frame_rate();
   CFRunLoopTimerRef runloopTimer = CFRunLoopTimerCreateWithHandler(
-    kCFAllocatorDefault, CFAbsoluteTimeGetCurrent() + 0.0166667, 0.0166667, 0, 0,
-    ^(CFRunLoopTimerRef timer) { _qtz_render_all_windows(); });
+    kCFAllocatorDefault, next_frame, 1.0 / backend_get_frame_rate(), 0, 0,
+    ^(CFRunLoopTimerRef timer) {
+      _qtz_render_all_windows();
+      CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+      do {
+        next_frame += 1.0 / backend_get_frame_rate();
+      } while (next_frame < now);
+      CFRunLoopTimerSetNextFireDate(timer, next_frame);
+    });
 
   CFRunLoopAddTimer(runloop, runloopTimer, kCFRunLoopCommonModes);
   //CFRunLoopAddTimer(runloop, runloopTimer, NSEventTrackingRunLoopMode);

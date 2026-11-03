@@ -27,6 +27,7 @@
 #include "../util.h"
 #include "../hashtable.h"
 #include "../event.h"
+#include "../backend.h"
 #include "x11_keysym.h"
 #include "x11_keyboard.h"
 #include "x11_backend.h"
@@ -739,7 +740,7 @@ x11_backend_run(
 
         /* Compute time until next frame, skip frames if needed */
         do {
-          ts_next_frame.tv_nsec += 1000000000 / 60;
+          ts_next_frame.tv_nsec += 1000000000 / backend_get_frame_rate();
           if (ts_next_frame.tv_nsec >= 1000000000) {
             ts_next_frame.tv_nsec -= 1000000000;
             ts_next_frame.tv_sec += 1;

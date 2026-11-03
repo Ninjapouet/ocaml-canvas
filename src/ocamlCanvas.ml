@@ -1182,6 +1182,17 @@ module V1 = struct
     external getCurrentTimestamp : unit -> Event.timestamp
       = "ml_canvas_get_current_timestamp"
 
+    external setFrameRate_internal : int -> unit
+      = "ml_canvas_set_frame_rate"
+
+    let setFrameRate fps =
+      if fps < 1 || fps > 1000 then
+        invalid_arg "Backend.setFrameRate: the rate must be within 1..1000";
+      setFrameRate_internal fps
+
+    external getFrameRate : unit -> int
+      = "ml_canvas_get_frame_rate"
+
     external getCanvas : int -> Canvas.t
       = "ml_canvas_get_canvas"
 
