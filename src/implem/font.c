@@ -78,6 +78,90 @@ font_destroy(
   }
 }
 
+/* Fonts in use are all kept in the cache; at most FONT_CACHE_UNUSED
+   unused ones are kept as well, the least recently released ones
+   being evicted first. The number of fonts is small, hence the plain
+   array. */
+
+#define FONT_CACHE_UNUSED 16
+
+static font_t **_font_cache = NULL;
+static size_t _font_cache_size = 0;
+static size_t _font_cache_capacity = 0;
+static uint64_t _font_cache_clock = 0;
+
+static void
+_font_cache_evict(
+  void)
+{
+  for (;;) {
+    size_t unused = 0, oldest = 0;
+    for (size_t i = 0; i < _font_cache_size; ++i) {
+      if (_font_cache[i]->users == 0) {
+        if ((unused == 0) ||
+            (_font_cache[i]->released < _font_cache[oldest]->released)) {
+          oldest = i;
+        }
+        ++unused;
+      }
+    }
+    if (unused <= FONT_CACHE_UNUSED) {
+      return;
+    }
+    font_destroy(_font_cache[oldest]);
+    _font_cache[oldest] = _font_cache[--_font_cache_size];
+  }
+}
+
+font_t *
+font_acquire(
+  const font_desc_t *fd)
+{
+  assert(fd != NULL);
+
+  for (size_t i = 0; i < _font_cache_size; ++i) {
+    if (font_matches(_font_cache[i], fd)) {
+      _font_cache[i]->users++;
+      return _font_cache[i];
+    }
+  }
+
+  if (_font_cache_size == _font_cache_capacity) {
+    size_t capacity = (_font_cache_capacity == 0) ?
+      16 : 2 * _font_cache_capacity;
+    font_t **cache =
+      (font_t **)realloc(_font_cache, capacity * sizeof(font_t *));
+    if (cache == NULL) {
+      return NULL;
+    }
+    _font_cache = cache;
+    _font_cache_capacity = capacity;
+  }
+
+  font_t *f = font_create((font_desc_t *)fd);
+  if (f == NULL) {
+    return NULL;
+  }
+
+  f->users = 1;
+  _font_cache[_font_cache_size++] = f;
+
+  return f;
+}
+
+void
+font_release(
+  font_t *f)
+{
+  assert(f != NULL);
+  assert(f->users > 0);
+
+  if (--f->users == 0) {
+    f->released = ++_font_cache_clock;
+    _font_cache_evict();
+  }
+}
+
 bool
 font_matches(
   const font_t *f,
@@ -139,6 +223,33 @@ font_char_metrics(
     case_QUARTZ(res = qtz_font_char_metrics((qtz_font_t *)f, c, m));
     case_X11(res = unx_font_char_metrics((unx_font_t *)f, c, m));
     case_WAYLAND(res = unx_font_char_metrics((unx_font_t *)f, c, m));
+    default_fail();
+  }
+
+  return res;
+}
+
+bool
+font_char_as_mask(
+  const font_t *f,
+  uint32_t c,
+  int32_t sx,
+  int32_t sy,
+  glyph_mask_t *m)
+{
+  assert(f != NULL);
+  assert(m != NULL);
+  assert(c <= 0x10FFFF);
+  assert((sx >= 0) && (sx < FONT_SUBPIXELS));
+  assert((sy >= 0) && (sy < FONT_SUBPIXELS));
+
+  bool res = false;
+
+  switch_IMPL() {
+    case_GDI(res = false);
+    case_QUARTZ(res = false);
+    case_X11(res = unx_font_char_as_mask((unx_font_t *)f, c, sx, sy, m));
+    case_WAYLAND(res = unx_font_char_as_mask((unx_font_t *)f, c, sx, sy, m));
     default_fail();
   }
 

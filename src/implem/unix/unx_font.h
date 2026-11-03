@@ -43,6 +43,14 @@ unx_font_char_metrics(
   uint32_t c,
   glyph_metrics_t *m); // out
 
+bool
+unx_font_char_as_mask(
+  const unx_font_t *f,
+  uint32_t c,
+  int32_t sx,
+  int32_t sy,
+  glyph_mask_t *m); // out
+
 void
 unx_font_metrics(
   const unx_font_t *f,

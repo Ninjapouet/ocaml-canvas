@@ -262,7 +262,7 @@ _canvas_destroy(
   }
 
   if (canvas->font != NULL) {
-    font_destroy(canvas->font);
+    font_release(canvas->font);
   }
 
   path2d_release(canvas->path_2d);
@@ -1423,6 +1423,21 @@ _canvas_build_rect(
   return p;
 }
 
+/* Whether drawing with the current state may use the fast paths of the
+   context: solid color and no shadow (as decided by poly_render) */
+static bool
+_canvas_solid_without_shadow(
+  const canvas_t *c,
+  draw_style_t style)
+{
+  const shadow_t *s = &c->state->shadow;
+  bool shadow = ((s->blur > 0.0) ||
+                 (s->offset_x != 0.0) || (s->offset_y != 0.0)) &&
+                (c->state->global_composite_operation != COPY) &&
+                (s->color.a != 0);
+  return (style.type == DRAW_STYLE_COLOR) && (shadow == false);
+}
+
 void
 canvas_fill_rect(
   canvas_t *c,
@@ -1435,6 +1450,23 @@ canvas_fill_rect(
   assert(c->state != NULL);
 
   _canvas_clip_region_ensure(c);
+
+  // Fast path: axis-aligned rectangle filled with a solid color
+  const transform_t *t = c->state->transform;
+  if ((t->b == 0.0) && (t->c == 0.0) &&
+      _canvas_solid_without_shadow(c, c->state->fill_style)) {
+    double x1 = t->a * x + t->e, x2 = t->a * (x + width) + t->e;
+    double y1 = t->d * y + t->f, y2 = t->d * (y + height) + t->f;
+    if (!isfinite(x1) || !isfinite(x2) || !isfinite(y1) || !isfinite(y2)) {
+      return;
+    }
+    if (context_fill_rect(c->context, x1, y1, x2, y2,
+                          c->state->fill_style.content.color,
+                          c->state->global_alpha,
+                          c->state->global_composite_operation)) {
+      return;
+    }
+  }
 
   rect_t bbox = { 0 };
   polygon_t *p = _canvas_build_rect(c, x, y, width, height, &bbox);
@@ -1499,12 +1531,12 @@ _canvas_prepare_font(
 {
   if (c->font != NULL &&
       font_matches(c->font, c->state->font_desc) == false) {
-    font_destroy(c->font);
+    font_release(c->font);
     c->font = NULL;
   }
 
   if (c->font == NULL) {
-    c->font = font_create(c->state->font_desc);
+    c->font = font_acquire(c->state->font_desc);
     if (c->font == NULL) {
       return false;
     }
@@ -1593,10 +1625,41 @@ canvas_fill_text(
     return;
   }
 
+  // Fast path: with a solid color and a translation, glyphs are drawn
+  // from their cached coverage masks, positioned to the nearest
+  // 1 / FONT_SUBPIXELS pixel; the other glyphs are rasterized
+  const transform_t *t = c->state->transform;
+  bool masks = (t->a == 1.0) && (t->b == 0.0) &&
+               (t->c == 0.0) && (t->d == 1.0) &&
+               _canvas_solid_without_shadow(c, c->state->fill_style);
+
   point_t pen = { x, y };
   while (*text) {
-    polygon_reset(p);
     uint32_t chr = decode_utf8_char(&text);
+
+    if (masks) {
+      double px = floor((pen.x + t->e) * FONT_SUBPIXELS + 0.5);
+      double py = floor((pen.y + t->f) * FONT_SUBPIXELS + 0.5);
+      if (isfinite(px) && isfinite(py) &&
+          (fabs(px) < INT32_MAX / 2) && (fabs(py) < INT32_MAX / 2)) {
+        int32_t qx = (int32_t)px, qy = (int32_t)py;
+        int32_t sx = ((qx % FONT_SUBPIXELS) + FONT_SUBPIXELS) % FONT_SUBPIXELS;
+        int32_t sy = ((qy % FONT_SUBPIXELS) + FONT_SUBPIXELS) % FONT_SUBPIXELS;
+        glyph_mask_t m = { 0 };
+        if (font_char_as_mask(c->font, chr, sx, sy, &m) &&
+            context_fill_mask(c->context, m.data, m.width, m.height, m.pitch,
+                              (qx - sx) / FONT_SUBPIXELS + m.left,
+                              (qy - sy) / FONT_SUBPIXELS - m.top,
+                              c->state->fill_style.content.color,
+                              c->state->global_alpha,
+                              c->state->global_composite_operation)) {
+          pen.x += m.advance;
+          continue;
+        }
+      }
+    }
+
+    polygon_reset(p);
     rect_t bbox = { 0 };
     if (font_char_as_poly(c->font, c->state->transform,
                           chr, &pen, p, &bbox) == true) {

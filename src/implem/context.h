@@ -81,6 +81,40 @@ context_render_polygon(
   bool non_zero,
   const transform_t *transform);
 
+/* Fast paths for the common cases of user interfaces. Both draw with a
+   solid color, without shadow, with a composite operation that only
+   affects the drawn area, and return false when the context cannot
+   handle the request, in which case the caller falls back on
+   context_render_polygon. */
+
+/* Fills the axis-aligned rectangle (x1, y1) - (x2, y2), in device
+   coordinates, with exact area coverage on its edges */
+bool
+context_fill_rect(
+  context_t *c,
+  double x1,
+  double y1,
+  double x2,
+  double y2,
+  color_t_ color,
+  double global_alpha,
+  composite_operation_t compose_op);
+
+/* Draws the 8-bit coverage mask [mask] of size [width] x [height] (rows
+   of [pitch] bytes) with its top left corner at (x, y) */
+bool
+context_fill_mask(
+  context_t *c,
+  const uint8_t *mask,
+  int32_t width,
+  int32_t height,
+  int32_t pitch,
+  int32_t x,
+  int32_t y,
+  color_t_ color,
+  double global_alpha,
+  composite_operation_t compose_op);
+
 void
 context_blit(
   context_t *dc,

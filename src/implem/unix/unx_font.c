@@ -11,12 +11,14 @@
 #if defined HAS_X11 || defined HAS_WAYLAND
 
 #include <stdlib.h>
+#include <string.h>
 #include <stdbool.h>
 #include <assert.h>
 
 #include <fontconfig/fontconfig.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include FT_OUTLINE_H
 
 #include "../util.h"
 #include "../point.h"
@@ -209,6 +211,31 @@ unx_font_destroy(
   assert(f != NULL);
   assert(f->ft_face != NULL);
 
+  if (f->glyphs != NULL) {
+    hashtable_iterator_t *i = ht_get_iterator(f->glyphs);
+    if (i != NULL) {
+      unx_glyph_t *g = NULL;
+      while ((g = (unx_glyph_t *)ht_iterator_next(i)) != NULL) {
+        free(g->data);
+        free(g);
+      }
+      ht_free_iterator(i);
+    }
+    ht_delete(f->glyphs);
+  }
+
+  if (f->metrics != NULL) {
+    hashtable_iterator_t *i = ht_get_iterator(f->metrics);
+    if (i != NULL) {
+      unx_metrics_t *m = NULL;
+      while ((m = (unx_metrics_t *)ht_iterator_next(i)) != NULL) {
+        free(m);
+      }
+      ht_free_iterator(i);
+    }
+    ht_delete(f->metrics);
+  }
+
   FT_Done_Face(f->ft_face);
   free(f);
 }
@@ -341,17 +368,135 @@ unx_font_char_as_poly(
   return true;
 }
 
-bool
-unx_font_char_metrics(
+static hash_t
+_unx_key_hash(
+  const void *key)
+{
+  return *(const uint32_t *)key * 2654435761u;
+}
+
+static bool
+_unx_key_equal(
+  const void *key1,
+  const void *key2)
+{
+  return *(const uint32_t *)key1 == *(const uint32_t *)key2;
+}
+
+static bool
+_unx_font_render_mask(
   const unx_font_t *f,
   uint32_t c,
-  glyph_metrics_t *m)
+  int32_t sx,
+  int32_t sy,
+  unx_glyph_t *g)
+{
+  // Same loading as unx_font_char_as_poly, so that both agree
+  if (FT_Load_Char(f->ft_face, c, FT_LOAD_NO_BITMAP) != 0) {
+    return false;
+  }
+
+  FT_GlyphSlot glyph = f->ft_face->glyph;
+  if (glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
+    return false;
+  }
+
+  g->advance = glyph->advance.x / 64.0;
+
+  // Subpixel offset, in 26.6 fixed point; FreeType's y axis goes upwards
+  FT_Outline_Translate(&glyph->outline,
+                       sx * 64 / FONT_SUBPIXELS, -sy * 64 / FONT_SUBPIXELS);
+
+  if ((FT_Render_Glyph(glyph, FT_RENDER_MODE_NORMAL) != 0) ||
+      (glyph->bitmap.pixel_mode != FT_PIXEL_MODE_GRAY)) {
+    return false;
+  }
+
+  const FT_Bitmap *b = &glyph->bitmap;
+  g->width = (int32_t)b->width;
+  g->height = (int32_t)b->rows;
+  g->pitch = (int32_t)b->width;
+  g->left = (int32_t)glyph->bitmap_left;
+  g->top = (int32_t)glyph->bitmap_top;
+  g->data = NULL;
+
+  if ((g->width > 0) && (g->height > 0)) {
+    g->data = (uint8_t *)malloc((size_t)g->width * (size_t)g->height);
+    if (g->data == NULL) {
+      return false;
+    }
+    // FreeType rows may be padded, and stored bottom-up (negative pitch)
+    for (int32_t r = 0; r < g->height; ++r) {
+      const uint8_t *row = (b->pitch >= 0) ?
+        b->buffer + (size_t)r * (size_t)b->pitch :
+        b->buffer + (size_t)(g->height - 1 - r) * (size_t)(-b->pitch);
+      memcpy(g->data + (size_t)r * (size_t)g->width, row, (size_t)g->width);
+    }
+  }
+
+  return true;
+}
+
+bool
+unx_font_char_as_mask(
+  const unx_font_t *f,
+  uint32_t c,
+  int32_t sx,
+  int32_t sy,
+  glyph_mask_t *m)
 {
   assert(f != NULL);
   assert(f->ft_face != NULL);
   assert(m != NULL);
   assert(c <= 0x10FFFF);
 
+  // The cache is an implementation detail: the font is logically const
+  unx_font_t *mf = (unx_font_t *)f;
+  if (mf->glyphs == NULL) {
+    mf->glyphs = ht_new(_unx_key_hash, _unx_key_equal, 256);
+    if (mf->glyphs == NULL) {
+      return false;
+    }
+  }
+
+  uint32_t key = (c * FONT_SUBPIXELS + (uint32_t)sx) * FONT_SUBPIXELS +
+                 (uint32_t)sy;
+  unx_glyph_t *g = (unx_glyph_t *)ht_find(mf->glyphs, &key);
+  if (g == NULL) {
+    g = (unx_glyph_t *)calloc(1, sizeof(unx_glyph_t));
+    if (g == NULL) {
+      return false;
+    }
+    g->key = key;
+    g->ok = _unx_font_render_mask(f, c, sx, sy, g);
+    if (ht_add(mf->glyphs, &g->key, g) == false) {
+      free(g->data);
+      free(g);
+      return false;
+    }
+  }
+
+  if (g->ok == false) {
+    return false;
+  }
+
+  m->data = g->data;
+  m->width = g->width;
+  m->height = g->height;
+  m->pitch = g->pitch;
+  m->left = g->left;
+  m->top = g->top;
+  m->advance = g->advance;
+
+  return true;
+}
+
+static bool
+_unx_font_load_metrics(
+  const unx_font_t *f,
+  uint32_t c,
+  glyph_metrics_t *m)
+{
   // Same loading as unx_font_char_as_poly, so that both agree
   if (FT_Load_Char(f->ft_face, c, FT_LOAD_NO_BITMAP) != 0) {
     return false;
@@ -370,6 +515,44 @@ unx_font_char_metrics(
   m->bottom = m->top - glyph->metrics.height / 64.0;
 
   return true;
+}
+
+bool
+unx_font_char_metrics(
+  const unx_font_t *f,
+  uint32_t c,
+  glyph_metrics_t *m)
+{
+  assert(f != NULL);
+  assert(f->ft_face != NULL);
+  assert(m != NULL);
+  assert(c <= 0x10FFFF);
+
+  // The cache is an implementation detail: the font is logically const
+  unx_font_t *mf = (unx_font_t *)f;
+  if (mf->metrics == NULL) {
+    mf->metrics = ht_new(_unx_key_hash, _unx_key_equal, 256);
+    if (mf->metrics == NULL) {
+      return _unx_font_load_metrics(f, c, m);
+    }
+  }
+
+  unx_metrics_t *e = (unx_metrics_t *)ht_find(mf->metrics, &c);
+  if (e == NULL) {
+    e = (unx_metrics_t *)calloc(1, sizeof(unx_metrics_t));
+    if (e == NULL) {
+      return _unx_font_load_metrics(f, c, m);
+    }
+    e->key = c;
+    e->ok = _unx_font_load_metrics(f, c, &e->m);
+    if (ht_add(mf->metrics, &e->key, e) == false) {
+      free(e);
+      return _unx_font_load_metrics(f, c, m);
+    }
+  }
+
+  *m = e->m;
+  return e->ok;
 }
 
 void

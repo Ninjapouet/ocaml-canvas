@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <math.h>
 
 #include "config.h"
 #include "target.h"
@@ -27,6 +28,8 @@
 
 #include "draw_instr.h"
 #include "poly_render.h"
+#include "color_composition.h"
+#include "util.h"
 #include "impexp.h"
 
 #ifdef HAS_GDI
@@ -375,6 +378,139 @@ sw_context_render_polygon(
   pixmap_t pm = pixmap(c->base.width, c->base.height, c->data);
   poly_render(&pm, p, bbox, draw_style, global_alpha, shadow, compose_op,
               &(c->clip_region), non_zero, transform);
+}
+
+/* Composes [color] with coverage [cov] (0..255) on pixel (i, j), as
+   poly_render does */
+static inline void
+_sw_context_compose(
+  sw_context_t *c,
+  pixmap_t *pm,
+  int32_t i,
+  int32_t j,
+  int cov,
+  color_t_ color,
+  int global_alpha,
+  composite_operation_t compose_op)
+{
+  int draw_alpha = (cov * global_alpha * color.a) / (256 * 255);
+  if (pixmap_valid(c->clip_region) == true) {
+    draw_alpha *= 255 - pixmap_at(c->clip_region, i, j).a;
+    draw_alpha /= 255;
+  }
+  pixmap_at(*pm, i, j) =
+    comp_compose(color, pixmap_at(*pm, i, j), draw_alpha, compose_op);
+}
+
+/* Length of the intersection of [a, b] with the pixel [k, k + 1] */
+static inline double
+_sw_context_overlap(
+  double a,
+  double b,
+  int32_t k)
+{
+  double lo = max(a, (double)k);
+  double hi = min(b, (double)(k + 1));
+  return (hi > lo) ? (hi - lo) : 0.0;
+}
+
+bool
+sw_context_fill_rect(
+  sw_context_t *c,
+  double x1,
+  double y1,
+  double x2,
+  double y2,
+  color_t_ color,
+  double global_alpha,
+  composite_operation_t compose_op)
+{
+  assert(c != NULL);
+  assert(c->data != NULL);
+
+  if (comp_is_full_screen(compose_op) == true) {
+    return false;
+  }
+
+  pixmap_t pm = pixmap(c->base.width, c->base.height, c->data);
+  int ga = fastround(global_alpha * 256.0);
+
+  if (x1 > x2) { swap(double, x1, x2); }
+  if (y1 > y2) { swap(double, y1, y2); }
+
+  int32_t j1 = max((int32_t)floor(x1), 0);
+  int32_t j2 = min((int32_t)ceil(x2), pm.width);
+  int32_t i1 = max((int32_t)floor(y1), 0);
+  int32_t i2 = min((int32_t)ceil(y2), pm.height);
+
+  // Fully covered pixels may simply be overwritten when the color is
+  // drawn opaque over them
+  bool overwrite = (compose_op == SOURCE_OVER) &&
+                   (pixmap_valid(c->clip_region) == false) &&
+                   ((255 * ga * color.a) / (256 * 255) == 255);
+
+  for (int32_t i = i1; i < i2; ++i) {
+    double cy = _sw_context_overlap(y1, y2, i);
+    for (int32_t j = j1; j < j2; ++j) {
+      // Only the first and last columns may be partially covered
+      double cx = ((j == j1) || (j == j2 - 1)) ?
+        _sw_context_overlap(x1, x2, j) : 1.0;
+      if ((cx == 1.0) && (cy == 1.0)) {
+        if (overwrite) {
+          pixmap_at(pm, i, j) = color;
+        } else {
+          _sw_context_compose(c, &pm, i, j, 255, color, ga, compose_op);
+        }
+      } else {
+        int cov = fastround(255.0 * cx * cy);
+        if (cov > 0) {
+          _sw_context_compose(c, &pm, i, j, cov, color, ga, compose_op);
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+bool
+sw_context_fill_mask(
+  sw_context_t *c,
+  const uint8_t *mask,
+  int32_t width,
+  int32_t height,
+  int32_t pitch,
+  int32_t x,
+  int32_t y,
+  color_t_ color,
+  double global_alpha,
+  composite_operation_t compose_op)
+{
+  assert(c != NULL);
+  assert(c->data != NULL);
+  assert((mask != NULL) || (width == 0) || (height == 0));
+
+  if (comp_is_full_screen(compose_op) == true) {
+    return false;
+  }
+
+  pixmap_t pm = pixmap(c->base.width, c->base.height, c->data);
+  int ga = fastround(global_alpha * 256.0);
+
+  int32_t r1 = max(0, -y), r2 = min(height, pm.height - y);
+  int32_t k1 = max(0, -x), k2 = min(width, pm.width - x);
+
+  for (int32_t r = r1; r < r2; ++r) {
+    const uint8_t *row = mask + (size_t)r * (size_t)pitch;
+    for (int32_t k = k1; k < k2; ++k) {
+      if (row[k] > 0) {
+        _sw_context_compose(c, &pm, y + r, x + k, row[k], color, ga,
+                            compose_op);
+      }
+    }
+  }
+
+  return true;
 }
 
 void

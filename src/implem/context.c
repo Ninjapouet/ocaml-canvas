@@ -177,6 +177,61 @@ context_render_polygon(
   }
 }
 
+bool
+context_fill_rect(
+  context_t *c,
+  double x1,
+  double y1,
+  double x2,
+  double y2,
+  color_t_ color,
+  double global_alpha,
+  composite_operation_t compose_op)
+{
+  assert(c != NULL);
+
+  bool res = false;
+
+  switch_ACCEL() {
+    case_HW(res = hw_context_fill_rect((hw_context_t *)c, x1, y1, x2, y2,
+                                       color, global_alpha, compose_op));
+    case_SW(res = sw_context_fill_rect((sw_context_t *)c, x1, y1, x2, y2,
+                                       color, global_alpha, compose_op));
+  }
+
+  return res;
+}
+
+bool
+context_fill_mask(
+  context_t *c,
+  const uint8_t *mask,
+  int32_t width,
+  int32_t height,
+  int32_t pitch,
+  int32_t x,
+  int32_t y,
+  color_t_ color,
+  double global_alpha,
+  composite_operation_t compose_op)
+{
+  assert(c != NULL);
+  assert((mask != NULL) || (width == 0) || (height == 0));
+
+  bool res = false;
+
+  switch_ACCEL() {
+    case_HW(res = hw_context_fill_mask((hw_context_t *)c, mask, width, height,
+                                       pitch, x, y, color, global_alpha,
+                                       compose_op));
+    case_SW(res = sw_context_fill_mask((sw_context_t *)c, mask, width, height,
+                                       pitch, x, y, color, global_alpha,
+                                       compose_op));
+  }
+
+  return res;
+}
+
 void
 context_blit(
   context_t *dc,

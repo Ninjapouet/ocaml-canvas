@@ -275,6 +275,40 @@ hw_context_render_polygon(
 
 }
 
+bool
+hw_context_fill_rect(
+  hw_context_t *c,
+  double x1,
+  double y1,
+  double x2,
+  double y2,
+  color_t_ color,
+  double global_alpha,
+  composite_operation_t compose_op)
+{
+  assert(c != NULL);
+
+  return false;
+}
+
+bool
+hw_context_fill_mask(
+  hw_context_t *c,
+  const uint8_t *mask,
+  int32_t width,
+  int32_t height,
+  int32_t pitch,
+  int32_t x,
+  int32_t y,
+  color_t_ color,
+  double global_alpha,
+  composite_operation_t compose_op)
+{
+  assert(c != NULL);
+
+  return false;
+}
+
 void
 hw_context_blit(
   hw_context_t *dc,
