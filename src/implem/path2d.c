@@ -10,6 +10,7 @@
 
 #include <stdbool.h>
 #include <assert.h>
+#include <math.h>
 
 #include "object.h"
 #include "path.h"
@@ -19,6 +20,28 @@
 #include "path2d_internal.h"
 
 IMPLEMENT_OBJECT_METHODS(path2d_t, path2d, _path2d_destroy)
+
+// As in the HTML5 canvas specification, path building operations
+// whose arguments are not all finite (infinite or NaN) are ignored:
+// a NaN coordinate reaching the rasterizer would make it crash.
+// The transformed points are checked as well, as a transform may
+// itself be non-finite or overflow. An ignored operation is not a
+// failure: it returns true.
+
+static bool
+_finite2(
+  double a,
+  double b)
+{
+  return isfinite(a) && isfinite(b);
+}
+
+static bool
+_finite_point(
+  point_t p)
+{
+  return _finite2(p.x, p.y);
+}
 
 path2d_t *
 path2d_create(
@@ -104,9 +127,17 @@ path2d_move_to(
   assert(path2d != NULL);
   assert(path2d->path != NULL);
 
+  if (!_finite2(x, y)) {
+    return true;
+  }
+
   point_t p = point(x, y);
   if (t != NULL) {
     transform_apply(t, &p);
+  }
+
+  if (!_finite_point(p)) {
+    return true;
   }
 
   _path2d_update_first_last(path2d, p.x, p.y, x, y, x, y, true);
@@ -124,9 +155,17 @@ path2d_line_to(
   assert(path2d != NULL);
   assert(path2d->path != NULL);
 
+  if (!_finite2(x, y)) {
+    return true;
+  }
+
   point_t p = point(x, y);
   if (t != NULL) {
     transform_apply(t, &p);
+  }
+
+  if (!_finite_point(p)) {
+    return true;
   }
 
   _path2d_update_first_last(path2d, p.x, p.y, x, y, x, y, false);
@@ -146,12 +185,20 @@ path2d_quadratic_curve_to(
   assert(path2d != NULL);
   assert(path2d->path != NULL);
 
+  if (!(_finite2(cpx, cpy) && _finite2(x, y))) {
+    return true;
+  }
+
   point_t cp = point(cpx, cpy);
   point_t p = point(x, y);
 
   if (t != NULL) {
     transform_apply(t, &cp);
     transform_apply(t, &p);
+  }
+
+  if (!_finite_point(cp) || !_finite_point(p)) {
+    return true;
   }
 
   _path2d_update_first_last(path2d, cp.x, cp.y, cpx, cpy, x, y, false);
@@ -173,6 +220,11 @@ path2d_bezier_curve_to(
   assert(path2d != NULL);
   assert(path2d->path != NULL);
 
+  if (!(_finite2(cp1x, cp1y) && _finite2(cp2x, cp2y) &&
+        _finite2(x, y))) {
+    return true;
+  }
+
   point_t cp1 = point(cp1x, cp1y);
   point_t cp2 = point(cp2x, cp2y);
   point_t p = point(x, y);
@@ -181,6 +233,10 @@ path2d_bezier_curve_to(
     transform_apply(t, &cp1);
     transform_apply(t, &cp2);
     transform_apply(t, &p);
+  }
+
+  if (!_finite_point(cp1) || !_finite_point(cp2) || !_finite_point(p)) {
+    return true;
   }
 
   _path2d_update_first_last(path2d, cp1.x, cp1.y, cp1x, cp1y, x, y, false);
@@ -200,6 +256,10 @@ path2d_rect(
 {
   assert(path2d != NULL);
   assert(path2d->path != NULL);
+
+  if (!(_finite2(x, y) && _finite2(width, height))) {
+    return;
+  }
 
   path2d_move_to(path2d, x, y, t);
   path2d_line_to(path2d, x + width, y, t);
@@ -244,6 +304,10 @@ path2d_arc(
   assert(path2d != NULL);
   assert(path2d->path != NULL);
 
+  if (!(_finite2(x, y) && _finite2(r, di) && isfinite(df))) {
+    return;
+  }
+
   double values[26];
   int nb_bezier = arc_to_bezier(values, x, y, r, r, di, df, ccw);
   _path2d_bezier_list(path2d, values, nb_bezier, t);
@@ -261,6 +325,10 @@ path2d_arc_to(
 {
   assert(path2d != NULL);
   assert(path2d->path != NULL);
+
+  if (!(_finite2(x1, y1) && _finite2(x2, y2) && isfinite(r))) {
+    return;
+  }
 
   // When the path is completely empty, we just move to midpoint
   // Note that even when the path contains a single move,
@@ -309,6 +377,11 @@ path2d_ellipse(
 {
   assert(path2d != NULL);
   assert(path2d->path != NULL);
+
+  if (!(_finite2(x, y) && _finite2(rx, ry) && _finite2(r, di) &&
+        isfinite(df))) {
+    return;
+  }
 
   double values[26];
   int nb_bezier = arc_to_bezier(values, x, y, rx, ry, di, df, ccw);

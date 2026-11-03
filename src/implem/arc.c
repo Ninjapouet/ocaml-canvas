@@ -152,8 +152,10 @@ arcto_to_bezier(
   double a = point_angle(p0, p1, p2);
 
   // If points are aligned, or if two (or more) points are identical,
-  // then just output the middle point  and exit
-  if ((a == 0.0) || point_equal(p0, p1) ||
+  // or if the radius is zero, then just output the middle point and exit
+  // (with a zero radius, both intermediate points would coincide with p1
+  // and the arc center would be computed by a division by zero)
+  if ((r == 0.0) || (a == 0.0) || point_equal(p0, p1) ||
       point_equal(p1, p2) || point_equal(p0, p2)) {
     values[0] = x1;
     values[1] = y1;
