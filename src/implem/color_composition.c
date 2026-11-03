@@ -71,13 +71,16 @@ comp_source_atop(
   color_t_ dst,
   int draw_alpha)
 {
-  int src_alpha = draw_alpha * dst.a / 255;
-  int dest_alpha = (255 - draw_alpha) * dst.a / 255;
-  int out_alpha = dst.a;
-  return color(out_alpha,
-               (dest_alpha * dst.r + src_alpha * src.r) / 255,
-               (dest_alpha * dst.g + src_alpha * src.g) / 255,
-               (dest_alpha * dst.b + src_alpha * src.b) / 255);
+  if (dst.a == 0) {
+    return color(0, 0, 0, 0);
+  }
+  // Colors are not premultiplied: the weights of the source and the
+  // destination (draw_alpha * dst.a and (1 - draw_alpha) * dst.a) are
+  // divided by the output alpha, which is dst.a
+  return color(dst.a,
+               ((255 - draw_alpha) * dst.r + draw_alpha * src.r) / 255,
+               ((255 - draw_alpha) * dst.g + draw_alpha * src.g) / 255,
+               ((255 - draw_alpha) * dst.b + draw_alpha * src.b) / 255);
 }
 
 color_t_
@@ -145,10 +148,15 @@ comp_lighter(
   color_t_ dst,
   int draw_alpha)
 {
-  return color(min(255, draw_alpha + dst.a),
-               min(255, src.r + dst.r),
-               min(255, src.g + dst.g),
-               min(255, src.b + dst.b));
+  // Sum of the premultiplied colors, divided by the output alpha
+  int out_alpha = min(255, draw_alpha + dst.a);
+  if (out_alpha == 0) {
+    return color(0, 0, 0, 0);
+  }
+  return color(out_alpha,
+               min(255, (draw_alpha * src.r + dst.a * dst.r) / out_alpha),
+               min(255, (draw_alpha * src.g + dst.a * dst.g) / out_alpha),
+               min(255, (draw_alpha * src.b + dst.a * dst.b) / out_alpha));
 }
 
 color_t_
@@ -172,10 +180,14 @@ comp_xor(
   int src_alpha = draw_alpha * (255 - dst.a) / 255;
   int dest_alpha = (255 - draw_alpha) * dst.a / 255;
   int out_alpha = src_alpha + dest_alpha;
+  if (out_alpha == 0) {
+    return color(0, 0, 0, 0);
+  }
+  // Colors are not premultiplied: divide by the output alpha
   return color(out_alpha,
-               (dest_alpha * dst.r + src_alpha * src.r) / 255,
-               (dest_alpha * dst.g + src_alpha * src.g) / 255,
-               (dest_alpha * dst.b + src_alpha * src.b) / 255);
+               (dest_alpha * dst.r + src_alpha * src.r) / out_alpha,
+               (dest_alpha * dst.g + src_alpha * src.g) / out_alpha,
+               (dest_alpha * dst.b + src_alpha * src.b) / out_alpha);
 }
 
 color_t_
