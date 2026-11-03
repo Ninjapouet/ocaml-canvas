@@ -26,6 +26,7 @@
 #include "../transform.h"
 #include "../font_desc_internal.h"
 #include "unx_font_internal.h"
+#include "unx_font.h"
 
 static bool _ft_initialized = false;
 static FcConfig *_fc_config = NULL;
@@ -338,6 +339,53 @@ unx_font_char_as_poly(
   pen->y += f->ft_face->glyph->advance.y / 64.0;
 
   return true;
+}
+
+bool
+unx_font_char_metrics(
+  const unx_font_t *f,
+  uint32_t c,
+  glyph_metrics_t *m)
+{
+  assert(f != NULL);
+  assert(f->ft_face != NULL);
+  assert(m != NULL);
+  assert(c <= 0x10FFFF);
+
+  // Same loading as unx_font_char_as_poly, so that both agree
+  if (FT_Load_Char(f->ft_face, c, FT_LOAD_NO_BITMAP) != 0) {
+    return false;
+  }
+
+  FT_GlyphSlot glyph = f->ft_face->glyph;
+  if (glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
+    return false;
+  }
+
+  m->advance = glyph->advance.x / 64.0;
+  m->has_ink = (glyph->outline.n_contours > 0);
+  m->left = glyph->metrics.horiBearingX / 64.0;
+  m->right = m->left + glyph->metrics.width / 64.0;
+  m->top = glyph->metrics.horiBearingY / 64.0;
+  m->bottom = m->top - glyph->metrics.height / 64.0;
+
+  return true;
+}
+
+void
+unx_font_metrics(
+  const unx_font_t *f,
+  double *ascent,
+  double *descent)
+{
+  assert(f != NULL);
+  assert(f->ft_face != NULL);
+  assert(f->ft_face->size != NULL);
+  assert(ascent != NULL);
+  assert(descent != NULL);
+
+  *ascent = f->ft_face->size->metrics.ascender / 64.0;
+  *descent = -f->ft_face->size->metrics.descender / 64.0;
 }
 
 /*

@@ -22,6 +22,17 @@
 
 typedef struct font_t font_t;
 
+/* Metrics of a glyph, in pixels, relative to the pen position on the
+   baseline. Distances to the left and below are negative. */
+typedef struct glyph_metrics_t {
+  double advance; /* horizontal advance of the pen */
+  bool has_ink;   /* false for glyphs that draw nothing (e.g. space) */
+  double left;    /* abscissa of the left side of the ink */
+  double right;   /* abscissa of the right side of the ink */
+  double top;     /* ordinate of the top of the ink (upwards) */
+  double bottom;  /* ordinate of the bottom of the ink (upwards) */
+} glyph_metrics_t;
+
 font_t *
 font_create(
   font_desc_t *fd);
@@ -53,5 +64,21 @@ font_char_as_poly_outline(
   point_t *pen, // in/out
   polygon_t *p, // out
   rect_t *bbox); // out
+
+/* Metrics of the glyph of character [c], as drawn by font_char_as_poly;
+   false if the font cannot draw it (font_char_as_poly does not move the
+   pen either in this case) */
+bool
+font_char_metrics(
+  const font_t *f,
+  uint32_t c,
+  glyph_metrics_t *m); // out
+
+/* Ascent and descent of the font, in pixels, both positive */
+void
+font_metrics(
+  const font_t *f,
+  double *ascent, // out
+  double *descent); // out
 
 #endif /* __FONT_H */

@@ -1424,6 +1424,16 @@ function ml_canvas_stroke_rect(canvas, pos, size) {
 }
 
 
+//Provides: ml_canvas_measure_text
+//Requires: caml_jsstring_of_string
+function ml_canvas_measure_text(canvas, text) {
+  var m = canvas.ctxt.measureText(caml_jsstring_of_string(text));
+  return [0, m.width,
+          m.actualBoundingBoxLeft, m.actualBoundingBoxRight,
+          m.actualBoundingBoxAscent, m.actualBoundingBoxDescent,
+          m.fontBoundingBoxAscent, m.fontBoundingBoxDescent];
+}
+
 //Provides: ml_canvas_fill_text
 //Requires: caml_jsstring_of_string
 function ml_canvas_fill_text(canvas, text, pos) {

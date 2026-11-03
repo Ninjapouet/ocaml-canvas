@@ -1513,6 +1513,61 @@ _canvas_prepare_font(
   return true;
 }
 
+bool
+canvas_measure_text(
+  canvas_t *c,
+  const char *text, // as UTF-8
+  text_metrics_t *tm) // out
+{
+  assert(c != NULL);
+  assert(c->state != NULL);
+  assert(text != NULL);
+  assert(tm != NULL);
+
+  if (_canvas_prepare_font(c) == false) {
+    return false;
+  }
+
+  // The pen moves as in canvas_fill_text: characters that the font
+  // cannot draw do not move it
+  double pen = 0.0;
+  bool has_ink = false;
+  double left = 0.0, right = 0.0, top = 0.0, bottom = 0.0;
+  while (*text) {
+    uint32_t chr = decode_utf8_char(&text);
+    glyph_metrics_t m = { 0 };
+    if (font_char_metrics(c->font, chr, &m) == false) {
+      continue;
+    }
+    if (m.has_ink) {
+      if (has_ink == false) {
+        left = pen + m.left;
+        right = pen + m.right;
+        top = m.top;
+        bottom = m.bottom;
+        has_ink = true;
+      } else {
+        left = min(left, pen + m.left);
+        right = max(right, pen + m.right);
+        top = max(top, m.top);
+        bottom = min(bottom, m.bottom);
+      }
+    }
+    pen += m.advance;
+  }
+
+  // Distances from the start of the text on the alphabetic baseline,
+  // positive to the left, right, top and bottom respectively
+  tm->width = pen;
+  tm->actual_left = -left;
+  tm->actual_right = right;
+  tm->actual_ascent = top;
+  tm->actual_descent = -bottom;
+  font_metrics(c->font, &tm->font_ascent, &tm->font_descent);
+
+  return true;
+}
+
 void
 canvas_fill_text(
   canvas_t *c,

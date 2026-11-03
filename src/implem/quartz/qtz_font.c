@@ -26,6 +26,7 @@
 #include "../font_desc_internal.h"
 #include "qtz_util.h"
 #include "qtz_font_internal.h"
+#include "qtz_font.h"
 
 static double
 _qtz_font_slant(
@@ -243,6 +244,66 @@ qtz_font_char_as_poly(
   pen->y += (double)advance.height;
 
   return true;
+}
+
+bool
+qtz_font_char_metrics(
+  const qtz_font_t *f,
+  uint32_t c,
+  glyph_metrics_t *m)
+{
+  assert(f != NULL);
+  assert(f->font != NULL);
+  assert(m != NULL);
+  assert(c <= 0x10FFFF);
+
+  // Same glyph lookup as qtz_font_char_as_poly, so that both agree
+  int nb_chars = 0;
+  UniChar uc[2] = { 0 };
+  if (c < 0x10000) {
+    nb_chars = 1;
+    uc[0] = (UniChar)c;
+  } else {
+    nb_chars = 2;
+    uc[0] = (UniChar)(0xD800 + ((c - 0x10000) >> 10));
+    uc[1] = (UniChar)(0xDC00 + (c & 0x3FF));
+  }
+  CGGlyph glyph[2] = { 0 };
+
+  if (CTFontGetGlyphsForCharacters(f->font, uc, glyph, nb_chars) == false) {
+    return false;
+  }
+
+  CGSize advance;
+  CTFontGetAdvancesForGlyphs(f->font, kCTFontOrientationDefault,
+                             glyph, &advance, 1);
+  CGRect rect = CTFontGetBoundingRectsForGlyphs(f->font,
+                                                kCTFontOrientationDefault,
+                                                glyph, NULL, 1);
+
+  m->advance = (double)advance.width;
+  m->has_ink = !CGRectIsEmpty(rect);
+  m->left = (double)CGRectGetMinX(rect);
+  m->right = (double)CGRectGetMaxX(rect);
+  m->top = (double)CGRectGetMaxY(rect);
+  m->bottom = (double)CGRectGetMinY(rect);
+
+  return true;
+}
+
+void
+qtz_font_metrics(
+  const qtz_font_t *f,
+  double *ascent,
+  double *descent)
+{
+  assert(f != NULL);
+  assert(f->font != NULL);
+  assert(ascent != NULL);
+  assert(descent != NULL);
+
+  *ascent = (double)CTFontGetAscent(f->font);
+  *descent = (double)CTFontGetDescent(f->font);
 }
 
 #else

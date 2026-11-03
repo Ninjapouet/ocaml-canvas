@@ -472,6 +472,27 @@ canvas_stroke_rect(
   double width,
   double height);
 
+/* Metrics of a text, in pixels, as in HTML5 TextMetrics: distances from
+   the start of the text on the alphabetic baseline, positive to the
+   left (actual_left), right, top (ascents) and bottom (descents) */
+typedef struct text_metrics_t {
+  double width;          /* advance of the whole text */
+  double actual_left;    /* bounding box of the ink */
+  double actual_right;
+  double actual_ascent;
+  double actual_descent;
+  double font_ascent;    /* ascent and descent of the font */
+  double font_descent;
+} text_metrics_t;
+
+/* Measures [text] with the current font of [c], ignoring the current
+   transform; false if the font is not available */
+bool
+canvas_measure_text(
+  canvas_t *c,
+  const char *text, // as UTF-8
+  text_metrics_t *tm); // out
+
 void
 canvas_fill_text(
   canvas_t *c,

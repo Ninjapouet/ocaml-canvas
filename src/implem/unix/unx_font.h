@@ -16,6 +16,7 @@
 #include "../polygon.h"
 #include "../transform.h"
 #include "../font_desc.h"
+#include "../font.h"
 
 typedef struct unx_font_t unx_font_t;
 
@@ -35,5 +36,17 @@ unx_font_char_as_poly(
   point_t *pen, // in/out
   polygon_t *p, // out
   rect_t *bbox); // out
+
+bool
+unx_font_char_metrics(
+  const unx_font_t *f,
+  uint32_t c,
+  glyph_metrics_t *m); // out
+
+void
+unx_font_metrics(
+  const unx_font_t *f,
+  double *ascent, // out
+  double *descent); // out
 
 #endif /* __UNX_FONT_H */

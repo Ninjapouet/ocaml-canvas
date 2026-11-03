@@ -1646,6 +1646,26 @@ ml_canvas_stroke_rect(
 }
 
 CAMLprim value
+ml_canvas_measure_text(
+  value mlCanvas,
+  value mlText)
+{
+  CAMLparam2(mlCanvas, mlText);
+  CAMLlocal1(mlResult);
+  text_metrics_t tm = { 0 };
+  canvas_measure_text(Canvas_val(mlCanvas), String_val(mlText), &tm);
+  mlResult = caml_alloc_tuple(7);
+  Store_field(mlResult, 0, caml_copy_double(tm.width));
+  Store_field(mlResult, 1, caml_copy_double(tm.actual_left));
+  Store_field(mlResult, 2, caml_copy_double(tm.actual_right));
+  Store_field(mlResult, 3, caml_copy_double(tm.actual_ascent));
+  Store_field(mlResult, 4, caml_copy_double(tm.actual_descent));
+  Store_field(mlResult, 5, caml_copy_double(tm.font_ascent));
+  Store_field(mlResult, 6, caml_copy_double(tm.font_descent));
+  CAMLreturn(mlResult);
+}
+
+CAMLprim value
 ml_canvas_fill_text(
   value mlCanvas,
   value mlText,

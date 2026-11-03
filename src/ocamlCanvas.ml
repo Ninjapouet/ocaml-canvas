@@ -273,6 +273,20 @@ module V1 = struct
 
   end
 
+  module TextMetrics = struct
+
+    type t = {
+      width : float;
+      actualBoundingBoxLeft : float;
+      actualBoundingBoxRight : float;
+      actualBoundingBoxAscent : float;
+      actualBoundingBoxDescent : float;
+      fontBoundingBoxAscent : float;
+      fontBoundingBoxDescent : float;
+    }
+
+  end
+
   type canvas
 
   type image_data =
@@ -791,6 +805,19 @@ module V1 = struct
 
     external strokeRect : t -> pos:Point.t -> size:Vector.t -> unit
       = "ml_canvas_stroke_rect"
+
+    external measureText_internal :
+      t -> string -> float * float * float * float * float * float * float
+      = "ml_canvas_measure_text"
+
+    let measureText c text =
+      let (width, actualBoundingBoxLeft, actualBoundingBoxRight,
+           actualBoundingBoxAscent, actualBoundingBoxDescent,
+           fontBoundingBoxAscent, fontBoundingBoxDescent) =
+        measureText_internal c text in
+      { TextMetrics.width; actualBoundingBoxLeft; actualBoundingBoxRight;
+        actualBoundingBoxAscent; actualBoundingBoxDescent;
+        fontBoundingBoxAscent; fontBoundingBoxDescent }
 
     external fillText : t -> string -> Point.t -> unit
       = "ml_canvas_fill_text"

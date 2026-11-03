@@ -19,6 +19,7 @@
 #include "../polygon.h"
 #include "../transform.h"
 #include "../font_desc.h"
+#include "../font.h"
 
 typedef struct gdi_font_t gdi_font_t;
 
@@ -38,5 +39,17 @@ gdi_font_char_as_poly(
   point_t *pen, // in/out
   polygon_t *p, // out
   rect_t *bbox); // out
+
+bool
+gdi_font_char_metrics(
+  const gdi_font_t *f,
+  uint32_t c,
+  glyph_metrics_t *m); // out
+
+void
+gdi_font_metrics(
+  const gdi_font_t *f,
+  double *ascent, // out
+  double *descent); // out
 
 #endif /* __GDI_FONT_H */

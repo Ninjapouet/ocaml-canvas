@@ -23,6 +23,7 @@
 #include "../transform.h"
 #include "../font_desc_internal.h"
 #include "gdi_font_internal.h"
+#include "gdi_font.h"
 
 static bool
 _gdi_font_slant(
@@ -239,6 +240,61 @@ gdi_font_char_as_poly(
   free(data);
 
   return true;
+}
+
+bool
+gdi_font_char_metrics(
+  const gdi_font_t *f,
+  uint32_t c,
+  glyph_metrics_t *m)
+{
+  assert(f != NULL);
+  assert(f->hdc != NULL);
+  assert(f->hfont != NULL);
+  assert(m != NULL);
+  assert(c <= 0x10FFFF);
+
+  static const MAT2 mat = { { 0, 1 }, { 0, 0 }, { 0, 0 }, { 0, 1 } };
+
+  GLYPHMETRICS gm = { 0 };
+
+  // Same query as gdi_font_char_as_poly, so that both agree; the size
+  // of the outline tells whether the glyph draws anything (GDI reports
+  // a 1x1 black box for blank glyphs)
+  DWORD size = GetGlyphOutlineW(f->hdc, c, GGO_NATIVE, &gm, 0, NULL, &mat);
+  if (size == GDI_ERROR) {
+    return false;
+  }
+
+  m->advance = (double)gm.gmCellIncX;
+  m->has_ink = (size > 0);
+  m->left = (double)gm.gmptGlyphOrigin.x;
+  m->right = m->left + (double)gm.gmBlackBoxX;
+  m->top = (double)gm.gmptGlyphOrigin.y;
+  m->bottom = m->top - (double)gm.gmBlackBoxY;
+
+  return true;
+}
+
+void
+gdi_font_metrics(
+  const gdi_font_t *f,
+  double *ascent,
+  double *descent)
+{
+  assert(f != NULL);
+  assert(f->hdc != NULL);
+  assert(ascent != NULL);
+  assert(descent != NULL);
+
+  TEXTMETRICW tm = { 0 };
+  if (GetTextMetricsW(f->hdc, &tm)) {
+    *ascent = (double)tm.tmAscent;
+    *descent = (double)tm.tmDescent;
+  } else {
+    *ascent = 0.0;
+    *descent = 0.0;
+  }
 }
 
 #else

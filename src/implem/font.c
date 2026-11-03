@@ -123,6 +123,48 @@ font_char_as_poly(
 }
 
 bool
+font_char_metrics(
+  const font_t *f,
+  uint32_t c,
+  glyph_metrics_t *m)
+{
+  assert(f != NULL);
+  assert(m != NULL);
+  assert(c <= 0x10FFFF);
+
+  bool res = false;
+
+  switch_IMPL() {
+    case_GDI(res = gdi_font_char_metrics((gdi_font_t *)f, c, m));
+    case_QUARTZ(res = qtz_font_char_metrics((qtz_font_t *)f, c, m));
+    case_X11(res = unx_font_char_metrics((unx_font_t *)f, c, m));
+    case_WAYLAND(res = unx_font_char_metrics((unx_font_t *)f, c, m));
+    default_fail();
+  }
+
+  return res;
+}
+
+void
+font_metrics(
+  const font_t *f,
+  double *ascent,
+  double *descent)
+{
+  assert(f != NULL);
+  assert(ascent != NULL);
+  assert(descent != NULL);
+
+  switch_IMPL() {
+    case_GDI(gdi_font_metrics((gdi_font_t *)f, ascent, descent));
+    case_QUARTZ(qtz_font_metrics((qtz_font_t *)f, ascent, descent));
+    case_X11(unx_font_metrics((unx_font_t *)f, ascent, descent));
+    case_WAYLAND(unx_font_metrics((unx_font_t *)f, ascent, descent));
+    default_fail();
+  }
+}
+
+bool
 font_char_as_poly_outline(
   const font_t *f,
   const transform_t *t,

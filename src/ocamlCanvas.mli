@@ -461,6 +461,34 @@ module V1 : sig
 
   end
 
+  module TextMetrics : sig
+  (** Text metrics, as returned by {!Canvas.measureText}.
+      As in HTML5, all distances are in pixels, from the start of the
+      text on its alphabetic baseline, and positive in the direction
+      that their name indicates. *)
+
+    type t = {
+      width : float;
+      (** Advance of the whole text *)
+      actualBoundingBoxLeft : float;
+      (** Distance to the left side of the bounding box of the text,
+          positive to the left *)
+      actualBoundingBoxRight : float;
+      (** Distance to the right side of the bounding box of the text *)
+      actualBoundingBoxAscent : float;
+      (** Distance to the top of the bounding box of the text *)
+      actualBoundingBoxDescent : float;
+      (** Distance to the bottom of the bounding box of the text,
+          positive downwards *)
+      fontBoundingBoxAscent : float;
+      (** Ascent of the font, independently of the text *)
+      fontBoundingBoxDescent : float;
+      (** Descent of the font, independently of the text,
+          positive downwards *)
+    }
+
+  end
+
   module ImageData : sig
   (** Image data manipulation functions *)
 
@@ -1130,6 +1158,12 @@ module V1 : sig
     (** [strokeRect c ~pos ~size] immediatly draws the outline of
         the rectangle specified by [pos] and [size] to the canvas
         [c] using the current stroke color and line width *)
+
+    val measureText : t -> string -> TextMetrics.t
+    (** [measureText c text] returns the metrics of the text [text] as
+        {!fillText} would draw it with the current font of canvas [c],
+        regardless of the current transform. A text that the current
+        font cannot draw has null metrics. *)
 
     val fillText : t -> string -> Point.t -> unit
     (** [fillText c text pos] immediatly draws the text [text] at
