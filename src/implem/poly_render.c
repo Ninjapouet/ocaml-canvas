@@ -542,11 +542,15 @@ _poly_render_layered(
       pixmap_destroy(shadow_poly);
     }
 
+    // The shadow pixmap is moved by whole pixels, so that it stays
+    // aligned with the destination: the offset is rounded
+    double offset_x = floor(shadow->offset_x + 0.5);
+    double offset_y = floor(shadow->offset_y + 0.5);
     rect_t sbbox =
-      rect(point(bbox->p1.x - shadow_size_offset + shadow->offset_x,
-                 bbox->p1.y - shadow_size_offset + shadow->offset_y),
-           point(bbox->p2.x + shadow_size_offset + shadow->offset_x,
-                 bbox->p2.y + shadow_size_offset + shadow->offset_y));
+      rect(point(bbox->p1.x - shadow_size_offset + offset_x,
+                 bbox->p1.y - shadow_size_offset + offset_y),
+           point(bbox->p2.x + shadow_size_offset + offset_x,
+                 bbox->p2.y + shadow_size_offset + offset_y));
 
     int32_t lower_bound_i = 0, upper_bound_i = pm->height;
     int32_t lower_bound_j = 0, upper_bound_j = pm->width;
@@ -773,14 +777,22 @@ poly_render(
   bool non_zero,
   const transform_t *transform)
 {
+  // The bounding box is used as a range of pixels, and as the origin of
+  // the intermediate pixmap of layered rendering: align it outwards on
+  // the pixel grid, so that pixels partially covered by the top and
+  // left edges are not skipped, and that the intermediate pixmap is
+  // aligned with the destination
+  rect_t pbox = rect(point(floor(bbox->p1.x), floor(bbox->p1.y)),
+                     point(ceil(bbox->p2.x), ceil(bbox->p2.y)));
+
   if ((shadow->blur > 0.0 ||
        shadow->offset_x != 0.0 || shadow->offset_y != 0.0) &&
       compose_op != COPY && shadow->color.a != 0) {
-    _poly_render_layered(s, p, bbox, draw_style, compose_op, shadow,
+    _poly_render_layered(s, p, &pbox, draw_style, compose_op, shadow,
                          global_alpha, clip_region, non_zero, transform);
   }
   else {
-    _poly_render_direct(s, p, bbox, draw_style, compose_op,
+    _poly_render_direct(s, p, &pbox, draw_style, compose_op,
                         global_alpha, clip_region, non_zero, transform);
   }
 }
