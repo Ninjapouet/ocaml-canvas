@@ -20,6 +20,7 @@
 
 #include "../hashtable.h"
 #include "../event.h"
+#include "../backend.h"
 
 typedef struct x11_keysyms_t {
   xcb_keysym_t *keysyms; /* points into xcb_xkb_get_map_reply_t */
@@ -73,6 +74,17 @@ typedef struct x11_backend_t {
   xcb_atom_t _MOTIF_WM_HINTS;
   xcb_atom_t _NET_WM_WINDOW_TYPE;
   xcb_atom_t _NET_WM_WINDOW_TYPE_SPLASH;
+
+  /* Clipboard: the CLIPBOARD selection is owned by an unmapped window;
+     the text we own, if any, and the pending read request */
+  xcb_atom_t CLIPBOARD;
+  xcb_atom_t TARGETS;
+  xcb_atom_t INCR;
+  xcb_atom_t _OCAML_CANVAS_SELECTION;
+  xcb_window_t clipboard_wid;
+  char *clipboard_text;
+  clipboard_cb_t *clipboard_cb;
+  void *clipboard_data;
 
 } x11_backend_t;
 

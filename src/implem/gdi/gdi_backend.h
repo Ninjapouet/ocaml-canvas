@@ -17,6 +17,7 @@
 #include <windows.h>
 
 #include "../event.h"
+#include "../backend.h"
 #include "gdi_window.h"
 
 typedef struct gdi_backend_t gdi_backend_t;
@@ -60,5 +61,14 @@ gdi_backend_run(
 void
 gdi_backend_stop(
   void);
+
+bool
+gdi_backend_set_clipboard_text(
+  const char *text);
+
+void
+gdi_backend_get_clipboard_text(
+  clipboard_cb_t *cb,
+  void *data);
 
 #endif /* __GDI_BACKEND_H */

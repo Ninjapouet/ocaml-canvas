@@ -1979,6 +1979,63 @@ ml_canvas_get_canvas(
   CAMLreturn(Val_canvas(result));
 }
 
+/* Clipboard */
+
+CAMLprim value
+ml_canvas_set_clipboard_text(
+  value mlText)
+{
+  CAMLparam1(mlText);
+  _ml_canvas_ensure_initialized();
+  CAMLreturn(Val_bool(backend_set_clipboard_text(String_val(mlText))));
+}
+
+static void
+_ml_canvas_clipboard_cb(
+  const char *text,
+  void *data)
+{
+  CAMLparam0();
+  CAMLlocal2(mlFun, mlResult);
+
+  value *root = (value *)data;
+  mlFun = *root;
+  caml_remove_generational_global_root(root);
+  free(root);
+
+  mlResult = caml_callback_exn(mlFun, caml_copy_string(text));
+  if (Is_exception_result(mlResult)) {
+    mlResult = Extract_exception(mlResult);
+    if (_ml_canvas_mlProcessEvent == Val_unit) {
+      /* Called synchronously, outside the event loop */
+      caml_raise(mlResult);
+    }
+    /* From the event loop: same treatment as an event handler */
+    if (_ml_canvas_mlException == Val_unit) {
+      caml_modify_generational_global_root(&_ml_canvas_mlException, mlResult);
+    }
+    backend_stop();
+  }
+
+  CAMLreturn0;
+}
+
+CAMLprim value
+ml_canvas_get_clipboard_text(
+  value mlFun)
+{
+  CAMLparam1(mlFun);
+  _ml_canvas_ensure_initialized();
+  value *root = (value *)malloc(sizeof(value));
+  if (root == NULL) {
+    caml_raise_out_of_memory();
+  }
+  *root = mlFun;
+  caml_register_generational_global_root(root);
+  backend_get_clipboard_text(_ml_canvas_clipboard_cb, (void *)root);
+  CAMLreturn(Val_unit);
+}
+
 CAMLprim value
 ml_canvas_get_current_timestamp(
   void)

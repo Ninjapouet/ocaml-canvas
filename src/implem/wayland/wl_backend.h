@@ -15,6 +15,7 @@
 #include <stdbool.h>
 
 #include "../event.h"
+#include "../backend.h"
 #include "wl_window.h"
 
 typedef struct wl_backend_t wl_backend_t;
@@ -58,5 +59,14 @@ wl_backend_run(
 void
 wl_backend_stop(
   void);
+
+bool
+wl_backend_set_clipboard_text(
+  const char *text);
+
+void
+wl_backend_get_clipboard_text(
+  clipboard_cb_t *cb,
+  void *data);
 
 #endif /* __WL_BACKEND_H */

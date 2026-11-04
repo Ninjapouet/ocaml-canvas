@@ -1185,6 +1185,12 @@ module V1 = struct
     external getCanvas : int -> Canvas.t
       = "ml_canvas_get_canvas"
 
+    external setClipboardText : string -> bool
+      = "ml_canvas_set_clipboard_text"
+
+    external getClipboardText : (string -> unit) -> unit
+      = "ml_canvas_get_clipboard_text"
+
     let run k =
       let open InternalEvent in
       let open Event in

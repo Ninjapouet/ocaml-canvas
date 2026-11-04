@@ -17,6 +17,7 @@
 #include <xcb/xcb.h>
 
 #include "../event.h"
+#include "../backend.h"
 #include "x11_window.h"
 
 typedef struct x11_backend_t x11_backend_t;
@@ -60,5 +61,14 @@ x11_backend_run(
 void
 x11_backend_stop(
   void);
+
+bool
+x11_backend_set_clipboard_text(
+  const char *text);
+
+void
+x11_backend_get_clipboard_text(
+  clipboard_cb_t *cb,
+  void *data);
 
 #endif /* __X11_BACKEND_H */

@@ -346,6 +346,71 @@ gdi_backend_stop(
   gdi_back->running = false;
 }
 
+/* Clipboard */
+
+bool
+gdi_backend_set_clipboard_text(
+  const char *text)
+{
+  assert(gdi_back != NULL);
+  assert(text != NULL);
+
+  int len = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
+  if (len <= 0) {
+    return false;
+  }
+  HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, len * sizeof(WCHAR));
+  if (mem == NULL) {
+    return false;
+  }
+  WCHAR *wtext = (WCHAR *)GlobalLock(mem);
+  MultiByteToWideChar(CP_UTF8, 0, text, -1, wtext, len);
+  GlobalUnlock(mem);
+
+  if (!OpenClipboard(NULL)) {
+    GlobalFree(mem);
+    return false;
+  }
+  EmptyClipboard();
+  bool result = (SetClipboardData(CF_UNICODETEXT, mem) != NULL);
+  CloseClipboard();
+  if (!result) {
+    GlobalFree(mem); /* otherwise owned by the system */
+  }
+
+  return result;
+}
+
+void
+gdi_backend_get_clipboard_text(
+  clipboard_cb_t *cb,
+  void *data)
+{
+  assert(gdi_back != NULL);
+  assert(cb != NULL);
+
+  char *text = NULL;
+  if (OpenClipboard(NULL)) {
+    HANDLE mem = GetClipboardData(CF_UNICODETEXT);
+    if (mem != NULL) {
+      const WCHAR *wtext = (const WCHAR *)GlobalLock(mem);
+      if (wtext != NULL) {
+        int len = WideCharToMultiByte(CP_UTF8, 0, wtext, -1, NULL, 0, NULL, NULL);
+        if (len > 0) {
+          text = (char *)calloc(len, sizeof(char));
+          if (text != NULL) {
+            WideCharToMultiByte(CP_UTF8, 0, wtext, -1, text, len, NULL, NULL);
+          }
+        }
+        GlobalUnlock(mem);
+      }
+    }
+    CloseClipboard();
+  }
+  cb(text != NULL ? text : "", data);
+  free(text);
+}
+
 static VOID CALLBACK
 _gdi_modal_timer_proc(
   HWND hwnd,

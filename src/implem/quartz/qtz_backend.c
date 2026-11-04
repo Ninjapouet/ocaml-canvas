@@ -536,6 +536,35 @@ qtz_backend_stop(
   qtz_back->running = false;
 }
 
+/* Clipboard */
+
+bool
+qtz_backend_set_clipboard_text(
+  const char *text)
+{
+  assert(qtz_back != NULL);
+  assert(text != NULL);
+
+  NSPasteboard *pb = [NSPasteboard generalPasteboard];
+  [pb clearContents];
+  return [pb setString:[NSString stringWithUTF8String:text]
+               forType:NSPasteboardTypeString];
+}
+
+void
+qtz_backend_get_clipboard_text(
+  clipboard_cb_t *cb,
+  void *data)
+{
+  assert(qtz_back != NULL);
+  assert(cb != NULL);
+
+  NSString *str =
+    [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+  const char *text = (str != nil) ? [str UTF8String] : NULL;
+  cb(text != NULL ? text : "", data);
+}
+
 #else
 
 const int qtz_backend = 0;

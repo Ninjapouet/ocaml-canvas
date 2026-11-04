@@ -1672,6 +1672,32 @@ function ml_canvas_get_canvas(id) {
   return surface.canvas;
 }
 
+//Provides: ml_canvas_set_clipboard_text
+//Requires: _ml_canvas_ensure_initialized, caml_jsstring_of_string
+function ml_canvas_set_clipboard_text(text) {
+  _ml_canvas_ensure_initialized();
+  if (!navigator.clipboard) {
+    return 0;
+  }
+  /* The browser may still refuse (permissions): best effort */
+  navigator.clipboard.writeText(caml_jsstring_of_string(text))
+    .catch(function () {});
+  return 1;
+}
+
+//Provides: ml_canvas_get_clipboard_text
+//Requires: _ml_canvas_ensure_initialized, caml_string_of_jsstring
+function ml_canvas_get_clipboard_text(f) {
+  _ml_canvas_ensure_initialized();
+  var deliver = function (t) { f(caml_string_of_jsstring(t)); };
+  if (!navigator.clipboard) {
+    deliver("");
+  } else {
+    navigator.clipboard.readText().then(deliver, function () { deliver(""); });
+  }
+  return 0;
+}
+
 //Provides: ml_canvas_get_current_timestamp
 //Requires: _ml_canvas_ensure_initialized
 //Requires: caml_int64_of_float

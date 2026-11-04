@@ -1550,6 +1550,28 @@ module V1 : sig
         {- {!Exception.Not_initialized} if {!Backend.init} was not called}
         {- {!Not_found} if no canvas has id [i]}} *)
 
+    val setClipboardText : string -> bool
+    (** [setClipboardText t] puts the UTF-8 text [t] in the system
+        clipboard, shared with other applications. It returns [false]
+        if the backend could not do it (the Wayland backend, or a
+        browser without clipboard access).
+
+        {b Exceptions:}
+        {ul
+        {- {!Exception.Not_initialized} if {!Backend.init} was not called}} *)
+
+    val getClipboardText : (string -> unit) -> unit
+    (** [getClipboardText f] calls [f] with the text of the system
+        clipboard, or [""] if it holds no text. Reading the clipboard
+        is asynchronous on X11 and in the browser: [f] may be called
+        right away (Windows, macOS, or when the application owns the
+        clipboard) or later from the event loop. A new request cancels
+        a pending one, whose callback receives [""].
+
+        {b Exceptions:}
+        {ul
+        {- {!Exception.Not_initialized} if {!Backend.init} was not called}} *)
+
     val getCurrentTimestamp : unit -> Event.timestamp
     (** [getCurrentTimestamp ()] returns the current timestamp
         in microseconds, from an arbitrary starting point

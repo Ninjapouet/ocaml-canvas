@@ -12,8 +12,10 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #include "../event.h"
+#include "wl_backend.h"
 #include "wl_backend_internal.h"
 #include "wl_window_internal.h"
 
@@ -81,6 +83,25 @@ void
 wl_backend_stop(
   void)
 {
+}
+
+/* Clipboard: not implemented by this backend yet */
+
+bool
+wl_backend_set_clipboard_text(
+  const char *text)
+{
+  assert(text != NULL);
+  return false;
+}
+
+void
+wl_backend_get_clipboard_text(
+  clipboard_cb_t *cb,
+  void *data)
+{
+  assert(cb != NULL);
+  cb("", data);
 }
 
 #else

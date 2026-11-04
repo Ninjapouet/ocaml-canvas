@@ -256,6 +256,50 @@ backend_stop(
   }
 }
 
+bool
+backend_set_clipboard_text(
+  const char *text)
+{
+  assert(text != NULL);
+
+  if (get_impl_type() == IMPL_NONE) {
+    return false;
+  }
+
+  bool result = false;
+
+  switch_IMPL() {
+    case_GDI(result = gdi_backend_set_clipboard_text(text));
+    case_QUARTZ(result = qtz_backend_set_clipboard_text(text));
+    case_X11(result = x11_backend_set_clipboard_text(text));
+    case_WAYLAND(result = wl_backend_set_clipboard_text(text));
+    default_fail();
+  }
+
+  return result;
+}
+
+void
+backend_get_clipboard_text(
+  clipboard_cb_t *cb,
+  void *data)
+{
+  assert(cb != NULL);
+
+  if (get_impl_type() == IMPL_NONE) {
+    cb("", data);
+    return;
+  }
+
+  switch_IMPL() {
+    case_GDI(gdi_backend_get_clipboard_text(cb, data));
+    case_QUARTZ(qtz_backend_get_clipboard_text(cb, data));
+    case_X11(x11_backend_get_clipboard_text(cb, data));
+    case_WAYLAND(wl_backend_get_clipboard_text(cb, data));
+    default_fail();
+  }
+}
+
 int32_t
 backend_next_id(
   void)

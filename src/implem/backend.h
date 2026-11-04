@@ -54,4 +54,23 @@ canvas_t *
 backend_get_canvas(
   int32_t id);
 
+/* Clipboard (text only, UTF-8) */
+
+/* Function called with the clipboard text, or "" if the clipboard holds
+   no text. The text is only valid during the call. */
+typedef void (clipboard_cb_t)(const char *text, void *data);
+
+bool
+backend_set_clipboard_text(
+  const char *text);
+
+/* The callback may be called before this function returns (Windows,
+   macOS, or when the application owns the clipboard), or later from
+   the event loop (X11). A new request cancels a pending one, whose
+   callback then receives "". */
+void
+backend_get_clipboard_text(
+  clipboard_cb_t *cb,
+  void *data);
+
 #endif /* __BACKEND_H */

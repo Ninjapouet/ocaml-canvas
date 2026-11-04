@@ -17,6 +17,7 @@
 #include <Cocoa/Cocoa.h>
 
 #include "../event.h"
+#include "../backend.h"
 #include "qtz_window.h"
 
 typedef struct qtz_backend_t qtz_backend_t;
@@ -60,5 +61,14 @@ qtz_backend_run(
 void
 qtz_backend_stop(
   void);
+
+bool
+qtz_backend_set_clipboard_text(
+  const char *text);
+
+void
+qtz_backend_get_clipboard_text(
+  clipboard_cb_t *cb,
+  void *data);
 
 #endif /* __QTZ_BACKEND_H */

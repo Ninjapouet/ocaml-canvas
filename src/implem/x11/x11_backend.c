@@ -297,6 +297,22 @@ x11_backend_init(
     _x11_query_atom(x11_back->c, "_NET_WM_WINDOW_TYPE");
   x11_back->_NET_WM_WINDOW_TYPE_SPLASH =
     _x11_query_atom(x11_back->c, "_NET_WM_WINDOW_TYPE_SPLASH");
+  x11_back->CLIPBOARD =
+    _x11_query_atom(x11_back->c, "CLIPBOARD");
+  x11_back->TARGETS =
+    _x11_query_atom(x11_back->c, "TARGETS");
+  x11_back->INCR =
+    _x11_query_atom(x11_back->c, "INCR");
+  x11_back->_OCAML_CANVAS_SELECTION =
+    _x11_query_atom(x11_back->c, "_OCAML_CANVAS_SELECTION");
+
+  /* Unmapped window that owns the clipboard and receives its contents */
+  x11_back->clipboard_wid = xcb_generate_id(x11_back->c);
+  xcb_create_window(x11_back->c, XCB_COPY_FROM_PARENT,
+                    x11_back->clipboard_wid, x11_back->screen->root,
+                    0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_ONLY,
+                    XCB_COPY_FROM_PARENT, 0, NULL);
+  xcb_flush(x11_back->c);
 
   return true;
 }
@@ -312,6 +328,11 @@ x11_backend_terminate(
   if (x11_back->xkb_get_map_reply != NULL) {
     free(x11_back->xkb_get_map_reply);
   }
+
+  if (x11_back->clipboard_cb != NULL) {
+    x11_back->clipboard_cb("", x11_back->clipboard_data);
+  }
+  free(x11_back->clipboard_text);
 
   if (x11_back->c != NULL) {
     xcb_disconnect(x11_back->c);
@@ -457,6 +478,152 @@ _x11_update_modifiers(
   } else {
     x11_back->modifiers &= ~modifier;
   }
+}
+
+/* Clipboard */
+
+static void
+_x11_answer_selection_request(
+  const xcb_selection_request_event_t *req)
+{
+  assert(req != NULL);
+
+  xcb_atom_t property = req->property;
+  if (property == XCB_ATOM_NONE) { /* obsolete clients */
+    property = req->target;
+  }
+
+  if (req->selection != x11_back->CLIPBOARD ||
+      x11_back->clipboard_text == NULL) {
+    property = XCB_ATOM_NONE;
+  } else if (req->target == x11_back->TARGETS) {
+    xcb_atom_t targets[3] =
+      { x11_back->TARGETS, x11_back->UTF8_STRING, XCB_ATOM_STRING };
+    xcb_change_property(x11_back->c, XCB_PROP_MODE_REPLACE, req->requestor,
+                        property, XCB_ATOM_ATOM, 32, 3, targets);
+  } else if (req->target == x11_back->UTF8_STRING ||
+             req->target == XCB_ATOM_STRING) {
+    /* STRING is Latin-1: plain ASCII text is the same in both */
+    xcb_change_property(x11_back->c, XCB_PROP_MODE_REPLACE, req->requestor,
+                        property, req->target, 8,
+                        strlen(x11_back->clipboard_text),
+                        x11_back->clipboard_text);
+  } else {
+    property = XCB_ATOM_NONE; /* unsupported target */
+  }
+
+  xcb_selection_notify_event_t notify = { 0 };
+  notify.response_type = XCB_SELECTION_NOTIFY;
+  notify.time = req->time;
+  notify.requestor = req->requestor;
+  notify.selection = req->selection;
+  notify.target = req->target;
+  notify.property = property;
+  xcb_send_event(x11_back->c, 0, req->requestor, XCB_EVENT_MASK_NO_EVENT,
+                 (const char *)&notify);
+  xcb_flush(x11_back->c);
+}
+
+static void
+_x11_deliver_clipboard(
+  const char *text)
+{
+  clipboard_cb_t *cb = x11_back->clipboard_cb;
+  void *data = x11_back->clipboard_data;
+  x11_back->clipboard_cb = NULL;
+  x11_back->clipboard_data = NULL;
+  if (cb != NULL) {
+    cb(text, data);
+  }
+}
+
+static void
+_x11_receive_selection(
+  const xcb_selection_notify_event_t *notify)
+{
+  assert(notify != NULL);
+
+  if (notify->property == XCB_ATOM_NONE) {
+    _x11_deliver_clipboard("");
+    return;
+  }
+
+  /* Read and delete the property (up to 16 MiB of text) */
+  xcb_get_property_cookie_t cookie =
+    xcb_get_property(x11_back->c, 1, x11_back->clipboard_wid,
+                     notify->property, XCB_GET_PROPERTY_TYPE_ANY,
+                     0, 4 * 1024 * 1024);
+  xcb_get_property_reply_t *reply =
+    xcb_get_property_reply(x11_back->c, cookie, NULL);
+
+  /* INCR transfers (very large selections) are not supported */
+  if (reply == NULL || reply->type == x11_back->INCR ||
+      reply->format != 8) {
+    free(reply);
+    _x11_deliver_clipboard("");
+    return;
+  }
+
+  int len = xcb_get_property_value_length(reply);
+  char *text = (char *)calloc(len + 1, sizeof(char));
+  if (text != NULL) {
+    memcpy(text, xcb_get_property_value(reply), len);
+  }
+  free(reply);
+  _x11_deliver_clipboard(text != NULL ? text : "");
+  free(text);
+}
+
+bool
+x11_backend_set_clipboard_text(
+  const char *text)
+{
+  assert(x11_back != NULL);
+  assert(text != NULL);
+
+  char *copy = strdup(text);
+  if (copy == NULL) {
+    return false;
+  }
+  free(x11_back->clipboard_text);
+  x11_back->clipboard_text = copy;
+
+  xcb_set_selection_owner(x11_back->c, x11_back->clipboard_wid,
+                          x11_back->CLIPBOARD, XCB_CURRENT_TIME);
+  xcb_flush(x11_back->c);
+
+  xcb_get_selection_owner_reply_t *reply =
+    xcb_get_selection_owner_reply(x11_back->c,
+      xcb_get_selection_owner(x11_back->c, x11_back->CLIPBOARD), NULL);
+  bool result = (reply != NULL) && (reply->owner == x11_back->clipboard_wid);
+  free(reply);
+
+  return result;
+}
+
+void
+x11_backend_get_clipboard_text(
+  clipboard_cb_t *cb,
+  void *data)
+{
+  assert(x11_back != NULL);
+  assert(cb != NULL);
+
+  /* A new request cancels the pending one */
+  _x11_deliver_clipboard("");
+
+  /* We own the clipboard: no round trip through the server */
+  if (x11_back->clipboard_text != NULL) {
+    cb(x11_back->clipboard_text, data);
+    return;
+  }
+
+  x11_back->clipboard_cb = cb;
+  x11_back->clipboard_data = data;
+  xcb_convert_selection(x11_back->c, x11_back->clipboard_wid,
+                        x11_back->CLIPBOARD, x11_back->UTF8_STRING,
+                        x11_back->_OCAML_CANVAS_SELECTION, XCB_CURRENT_TIME);
+  xcb_flush(x11_back->c);
 }
 
 void
@@ -653,12 +820,21 @@ x11_backend_run(
           break;
 
         case XCB_SELECTION_CLEAR:
+          /* Another client now owns the clipboard */
+          if (e.selection_clear->selection == x11_back->CLIPBOARD) {
+            free(x11_back->clipboard_text);
+            x11_back->clipboard_text = NULL;
+          }
           break;
 
         case XCB_SELECTION_REQUEST:
+          _x11_answer_selection_request(e.selection_request);
           break;
 
         case XCB_SELECTION_NOTIFY:
+          if (e.selection_notify->requestor == x11_back->clipboard_wid) {
+            _x11_receive_selection(e.selection_notify);
+          }
           break;
 
         case XCB_COLORMAP_NOTIFY:
